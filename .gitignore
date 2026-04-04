@@ -1,0 +1,10 @@
+config.py
+credentials.json
+token.json
+token.pickle
+historico_aprendizado.json
+__pycache__/
+venv/
+*.mp3
+*.mp4
+/tmp/

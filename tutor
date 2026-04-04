@@ -1,0 +1,57 @@
+import requests
+import json
+import time
+import threading
+from config import TELEGRAM_TOKEN, OLLAMA_MODEL, OLLAMA_URL
+
+TELEGRAM_URL = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}"
+
+def perguntar_ollama(pergunta, contexto=""):
+    prompt = f"""Você é a Ari, tutora pessoal da Ariana. 
+Ensina de forma socrática, divertida e bilíngue (português e inglês).
+Sempre explica termos técnicos em inglês com tradução.
+Contexto anterior: {contexto}
+Pergunta: {pergunta}"""
+    
+    response = requests.post(OLLAMA_URL, json={
+        "model": OLLAMA_MODEL,
+        "prompt": prompt,
+        "stream": False
+    })
+    return response.json()["response"]
+
+def enviar_mensagem(chat_id, texto):
+    requests.post(f"{TELEGRAM_URL}/sendMessage", json={
+        "chat_id": chat_id,
+        "text": texto,
+        "parse_mode": "Markdown"
+    })
+
+def obter_updates(offset=0):
+    response = requests.get(f"{TELEGRAM_URL}/getUpdates", params={
+        "offset": offset,
+        "timeout": 30
+    })
+    return response.json()
+
+def iniciar_bot():
+    print("✅ Bot iniciado! Aguardando mensagens...")
+    offset = 0
+    while True:
+        try:
+            updates = obter_updates(offset)
+            for update in updates.get("result", []):
+                offset = update["update_id"] + 1
+                if "message" in update:
+                    chat_id = update["message"]["chat"]["id"]
+                    texto = update["message"].get("text", "")
+                    if texto:
+                        print(f"📩 Mensagem recebida: {texto}")
+                        resposta = perguntar_ollama(texto)
+                        enviar_mensagem(chat_id, resposta)
+        except Exception as e:
+            print(f"Erro: {e}")
+            time.sleep(5)
+
+if __name__ == "__main__":
+    iniciar_bot()
