@@ -17,7 +17,7 @@ TELEGRAM_URL = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}"
 CHAT_ID = "6968289835"
 groq_client = Groq(api_key=GROQ_API_KEY)
 
-COOKIES_FILE = "/home/ariana/sistema-tutor/cookies.txt"
+COOKIES_FILE = "/home/ubuntu/ariana-tutor/cookies.txt"
 
 QUERIES_FONTES = [
     "{tema} tutorial site:developer.mozilla.org OR site:web.dev OR site:devdocs.io",
@@ -398,7 +398,7 @@ def enviar_progresso(mensagem):
 
 def salvar_no_drive(doc_pt, doc_en, titulo="Aula"):
     data = datetime.now().strftime("%Y-%m-%d_%H-%M")
-    pasta_base = f"/home/ariana/sistema-tutor/materiais/{data}"
+    pasta_base = f"/home/ubuntu/ariana-tutor/materiais/{data}"
     os.makedirs(pasta_base, exist_ok=True)
 
     # Texto bilíngue PT + EN

@@ -4,13 +4,13 @@ import time
 import os
 import json
 
-FILA_FILE = "/home/ariana/sistema-tutor/fila_videos.json"
+FILA_FILE = "/home/ubuntu/ariana-tutor/fila_videos.json"
 
 def rodar_tutor():
-    subprocess.run(["python3", "tutor.py"])
+    subprocess.run(["/home/ubuntu/ariana-tutor/venv/bin/python3", "tutor.py"])
 
 def rodar_notificacoes():
-    subprocess.run(["python3", "notificacoes.py"])
+    subprocess.run(["/home/ubuntu/ariana-tutor/venv/bin/python3", "notificacoes.py"])
 
 def retomar_fila_pendente():
     if not os.path.exists(FILA_FILE):
@@ -21,9 +21,9 @@ def retomar_fila_pendente():
     if not videos:
         return
     print(f"Fila pendente encontrada: {len(videos)} vídeo(s). Retomando...")
-    subprocess.run(["python3", "-c", f"""
+    subprocess.run(["/home/ubuntu/ariana-tutor/venv/bin/python3", "-c", f"""
 import sys
-sys.path.insert(0, '/home/ariana/sistema-tutor')
+sys.path.insert(0, '/home/ubuntu/ariana-tutor')
 from transcrever import processar_youtube, enviar_progresso
 from fila import carregar_fila, remover_video_processado
 import os

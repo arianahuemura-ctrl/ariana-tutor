@@ -191,3 +191,9 @@ if __name__ == "__main__":
         else:
             print("Fora do horário, aguardando...")
         time.sleep(7200)
+# Aliases para compatibilidade com tutor.py
+def verificar_resposta(texto):
+    return processar_resposta_usuario(texto)
+
+def tem_notificacao_pendente():
+    return False

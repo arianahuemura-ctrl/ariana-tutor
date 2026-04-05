@@ -6,7 +6,7 @@ from groq import Groq
 from config import GROQ_API_KEY
 
 groq_client = Groq(api_key=GROQ_API_KEY)
-chroma_client = chromadb.PersistentClient(path="/home/ariana/sistema-tutor/base_dados")
+chroma_client = chromadb.PersistentClient(path="/home/ubuntu/ariana-tutor/base_dados")
 
 def get_colecao(nome):
     return chroma_client.get_or_create_collection(name=nome)
