@@ -453,7 +453,27 @@ def processar_youtube(url, materiais_apoio=None):
         fontes = buscar_fontes_confiaveis(transcricao[:300])
 
         enviar_progresso("🧠 Analisando conteúdo (pode demorar alguns minutos)...")
-        doc_pt, doc_en = analisar_completo(transcricao, material_texto, fontes)
+        tentativa_analise = 0
+        while tentativa_analise < 10:
+            try:
+                doc_pt, doc_en = analisar_completo(transcricao, material_texto, fontes)
+                break
+            except Exception as e:
+                erro_str = str(e)
+                if "rate_limit_exceeded" in erro_str or "429" in erro_str:
+                    import re as re2
+                    minutos = re2.search(r'(\d+)m', erro_str)
+                    segundos = re2.search(r'(\d+\.\d+)s', erro_str)
+                    espera = 60
+                    if minutos:
+                        espera = int(minutos.group(1)) * 60 + 30
+                    elif segundos:
+                        espera = int(float(segundos.group(1))) + 30
+                    enviar_progresso(f"⏳ Limite atingido. Aguardando {espera//60} min...")
+                    time.sleep(espera)
+                    tentativa_analise += 1
+                else:
+                    raise
 
         titulo = f"Aula_{datetime.now().strftime('%Y%m%d_%H%M')}"
         salvar_no_drive(doc_pt, doc_en, titulo)
