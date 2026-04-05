@@ -5,12 +5,13 @@ import threading
 import asyncio
 import edge_tts
 import re
-from config import TELEGRAM_TOKEN, GROQ_API_KEY
+from config import TELEGRAM_TOKEN, GROQ_API_KEY, CEREBRAS_API_KEY
 from groq import Groq
 from base_conhecimento import buscar_contexto_pessoal, salvar_aprendizado, gerar_diario_hoje, salvar_historico, carregar_historico_recente
 
 TELEGRAM_URL = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}"
 groq_client = Groq(api_key=GROQ_API_KEY)
+cerebras_client = Groq(api_key=CEREBRAS_API_KEY, base_url="https://api.cerebras.ai/v1")
 sessoes = {}
 
 SISTEMA_PROMPT = """You are Guy, a funny casual American guy who is learning tech stuff together with your Brazilian friend Ariana.
@@ -46,13 +47,21 @@ def detectar_intencao(texto):
     return "conversa"
 
 def perguntar_groq(mensagens):
-    resposta = groq_client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
-        messages=mensagens,
-        temperature=0.7,
-        max_tokens=1000
-    )
-    return resposta.choices[0].message.content
+    for cliente, nome in [(groq_client, "Groq"), (cerebras_client, "Cerebras")]:
+        try:
+            resposta = cliente.chat.completions.create(
+                model="llama-3.3-70b-versatile",
+                messages=mensagens,
+                temperature=0.7,
+                max_tokens=1000
+            )
+            return resposta.choices[0].message.content
+        except Exception as e:
+            if "rate_limit" in str(e).lower() or "429" in str(e):
+                print(f"{nome} limite atingido, tentando proximo...")
+                continue
+            raise e
+    return "Limite atingido em todos os servicos. Tente apos as 21h." 
 
 def transcrever_voz(caminho_audio):
     with open(caminho_audio, "rb") as f:
