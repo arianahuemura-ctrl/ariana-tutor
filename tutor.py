@@ -7,7 +7,7 @@ import edge_tts
 import re
 from config import TELEGRAM_TOKEN, GROQ_API_KEY
 from groq import Groq
-from base_conhecimento import buscar_contexto_pessoal, salvar_aprendizado, gerar_diario_hoje
+from base_conhecimento import buscar_contexto_pessoal, salvar_aprendizado, gerar_diario_hoje, salvar_historico, carregar_historico_recente
 
 TELEGRAM_URL = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}"
 groq_client = Groq(api_key=GROQ_API_KEY)
@@ -143,7 +143,7 @@ def get_sessao(chat_id):
             "materiais": [],
             "videos": [],
             "semana": None,
-            "historico": [{"role": "system", "content": SISTEMA_PROMPT}]
+            "historico": [{"role": "system", "content": SISTEMA_PROMPT}] + carregar_historico_recente(20)
         }
     return sessoes[chat_id]
 
@@ -348,10 +348,11 @@ def processar_mensagem(chat_id, mensagem):
     tema_detectado = next((t for t in ["HTML", "CSS", "JavaScript", "Python", "Git", "UX Design", "Figma", "banco de dados", "responsive design", "acessibilidade"] if t.lower() in texto_usuario.lower()), "")
     if tema_detectado:
         salvar_ultimo_tema(tema_detectado)
-
+    salvar_historico("user", texto_usuario, tema_detectado)
+    salvar_historico("assistant", resposta, tema_detectado)
     # Resposta em áudio — sempre voz do amigo americano
     falar_em_partes(chat_id, resposta, voz="pt-BR-AntonioNeural")
-
+    
 def iniciar_bot():
     print("Bot iniciado com Groq!")
     offset = 0

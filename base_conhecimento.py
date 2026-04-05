@@ -131,3 +131,29 @@ if __name__ == "__main__":
     print("Base de conhecimento iniciada!")
     print(f"Aulas salvas: {get_colecao('aulas').count()}")
     print(f"Aprendizados salvos: {get_colecao('aprendizado').count()}")
+def salvar_historico(role, conteudo, tema=""):
+    colecao = get_colecao("historico")
+    doc_id = f"hist_{datetime.now().strftime('%Y%m%d_%H%M%S%f')}"
+    colecao.add(
+        documents=[conteudo],
+        metadatas=[{
+            "role": role,
+            "data": datetime.now().strftime("%Y-%m-%d"),
+            "hora": datetime.now().strftime("%H:%M"),
+            "tema": tema
+        }],
+        ids=[doc_id]
+    )
+
+def carregar_historico_recente(n=20):
+    colecao = get_colecao("historico")
+    total = colecao.count()
+    if total == 0:
+        return []
+    resultados = colecao.get(
+        limit=min(n, total),
+        include=["documents", "metadatas"]
+    )
+    pares = list(zip(resultados["metadatas"], resultados["documents"]))
+    pares_ordenados = sorted(pares, key=lambda x: x[0].get("hora", ""))
+    return [{"role": m["role"], "content": d} for m, d in pares_ordenados]
