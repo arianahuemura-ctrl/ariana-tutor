@@ -36,7 +36,9 @@ def processando_video():
     return os.path.exists(PROCESSANDO_FILE)
 
 def gerar_notificacao():
-    tema = random.choice(temas)
+    from fila import ler_ultimo_tema
+    ultimo = ler_ultimo_tema()
+    tema = ultimo if ultimo else random.choice(temas)
     resposta = groq_client.chat.completions.create(
         model="llama-3.3-70b-versatile",
         messages=[

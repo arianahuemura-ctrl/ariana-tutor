@@ -26,3 +26,14 @@ def limpar_fila():
 def fila_vazia():
     videos, _ = carregar_fila()
     return len(videos) == 0
+ULTIMO_TEMA_FILE = "/tmp/ultimo_tema.txt"
+
+def salvar_ultimo_tema(tema):
+    with open(ULTIMO_TEMA_FILE, "w") as f:
+        f.write(tema)
+
+def ler_ultimo_tema():
+    if not os.path.exists(ULTIMO_TEMA_FILE):
+        return None
+    with open(ULTIMO_TEMA_FILE) as f:
+        return f.read().strip()

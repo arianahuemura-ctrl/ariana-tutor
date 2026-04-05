@@ -344,6 +344,10 @@ def processar_mensagem(chat_id, mensagem):
         sessao["historico"] = [sistema] + sessao["historico"][-20:]
 
     salvar_aprendizado(texto_usuario, resposta)
+    from fila import salvar_ultimo_tema
+    tema_detectado = next((t for t in ["HTML", "CSS", "JavaScript", "Python", "Git", "UX Design", "Figma", "banco de dados", "responsive design", "acessibilidade"] if t.lower() in texto_usuario.lower()), "")
+    if tema_detectado:
+        salvar_ultimo_tema(tema_detectado)
 
     # Resposta em áudio — sempre voz do amigo americano
     falar_em_partes(chat_id, resposta, voz="pt-BR-AntonioNeural")
