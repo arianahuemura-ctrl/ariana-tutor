@@ -37,9 +37,9 @@ def detectar_intencao(texto):
         return "flashcard"
     if any(x in texto_lower for x in ["relatorio", "relatório", "diario", "diário", "o que aprendi"]):
         return "relatorio"
-    if any(x in texto_lower for x in ["questao", "questão", "prova", "exercicio", "exercício", "teste"]):
+    if any(x in texto_lower for x in ["gera questao", "gera questão", "cria questao", "cria questão", "questoes sobre", "questões sobre", "me faz", "me dá exercicio", "exercicios sobre", "exercícios sobre"]):
         return "questoes"
-    if any(x in texto_lower for x in ["resumo", "resume", "resumir"]):
+    if any(x in texto_lower for x in ["faz resumo", "faz um resumo", "resume isso", "quero resumo", "me resume"]):
         return "resumo"
     if any(x in texto_lower for x in ["/limpar", "recomeça", "recomecar", "reinicia"]):
         return "limpar"
