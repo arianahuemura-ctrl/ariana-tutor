@@ -272,8 +272,9 @@ def processar_mensagem(chat_id, mensagem):
                 from fila import salvar_fila, remover_video_processado
                 for i, url in enumerate(sessao["videos"]):
                     enviar_mensagem(chat_id, f"📹 Processando vídeo {i+1}/{total}...")
-                    processar_youtube(url, sessao["materiais"])
+                    resultado = processar_youtube(url, sessao["materiais"])
                     remover_video_processado(url)
+                    sessao["videos"] = [v for v in sessao["videos"] if v != url]
                     salvar_fila(sessao["videos"], sessao["materiais"])
                     if resultado is None:
                         enviar_mensagem(chat_id, f"⚠️ Vídeo {i+1} pulado — sem áudio disponível")
