@@ -495,7 +495,6 @@ def processar_youtube(url, materiais_apoio=None):
             espera += 30
             enviar_progresso(f"⏳ Limite de tokens atingido. Aguardando {espera//60} minutos e tentando de novo...")
             time.sleep(espera)
-            return processar_youtube(url, materiais_apoio)
         enviar_progresso(f"❌ Erro: {e}")
         raise
 
