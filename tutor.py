@@ -1,123 +1,133 @@
 import requests
 import time
+import os
+import threading
 import asyncio
 import edge_tts
-import wikipediaapi
-from groq import Groq
-from ddgs import DDGS
+import re
 from config import TELEGRAM_TOKEN, GROQ_API_KEY
+from groq import Groq
+from base_conhecimento import buscar_contexto_pessoal, salvar_aprendizado, gerar_diario_hoje
 
 TELEGRAM_URL = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}"
-wiki = wikipediaapi.Wikipedia(language='en', user_agent='ArianaBot/1.0')
 groq_client = Groq(api_key=GROQ_API_KEY)
+sessoes = {}
 
-PALAVRAS_TECH = ["html", "css", "javascript", "python", "django", "api", "git", "github", "banco de dados", "sql", "mysql", "backend", "frontend", "codigo", "variavel", "array", "loop", "classe"]
-PALAVRAS_UX = ["ux", "ui", "design", "figma", "prototipo", "wireframe", "usabilidade", "interface", "usuario", "acessibilidade", "tipografia", "cor", "layout", "componente"]
+SISTEMA_PROMPT = """You are Guy, a funny casual American guy who is learning tech stuff together with your Brazilian friend Ariana.
+Ariana is studying IT (4th semester), learning English from scratch, UX/UI, web development and other IT areas.
+Your style:
+- You're a friend, not a teacher — you're both learning together
+- Ask ONE question at a time and wait for the answer
+- If she gets something wrong, correct her gently and with humor
+- Celebrate when she gets it right, then go deeper
+- Be fun and use light humor
+- Analyze EXACTLY what she said
+- Respond in the SAME language she writes — if she writes in Portuguese, reply in Portuguese; if in English, reply in English
+- Keep it concise — max 3 paragraphs
+- End with ONE question or challenge
+- When using an English tech term, give pronunciation and translation"""
 
-historico = {}
-aguardando = {}
+def detectar_intencao(texto):
+    texto_lower = texto.lower()
+    if any(x in texto_lower for x in ["youtube.com", "youtu.be"]):
+        return "video"
+    if any(x in texto_lower for x in ["/processar", "processa", "analisa", "analise"]):
+        return "processar"
+    if any(x in texto_lower for x in ["flashcard", "flash card", "cartão", "cartao"]):
+        return "flashcard"
+    if any(x in texto_lower for x in ["relatorio", "relatório", "diario", "diário", "o que aprendi"]):
+        return "relatorio"
+    if any(x in texto_lower for x in ["questao", "questão", "prova", "exercicio", "exercício", "teste"]):
+        return "questoes"
+    if any(x in texto_lower for x in ["resumo", "resume", "resumir"]):
+        return "resumo"
+    if any(x in texto_lower for x in ["/limpar", "recomeça", "recomecar", "reinicia"]):
+        return "limpar"
+    return "conversa"
 
-def detectar_tipo(pergunta):
-    pergunta_lower = pergunta.lower()
-    for palavra in PALAVRAS_UX:
-        if palavra in pergunta_lower:
-            return "ux"
-    for palavra in PALAVRAS_TECH:
-        if palavra in pergunta_lower:
-            return "tech"
-    return "geral"
-
-def buscar_mdn(pergunta):
-    try:
-        with DDGS() as ddgs:
-            resultados = list(ddgs.text(pergunta + " site:developer.mozilla.org", max_results=2))
-            return " ".join([r["body"] for r in resultados])[:500]
-    except:
-        return ""
-
-def buscar_ux(pergunta):
-    try:
-        with DDGS() as ddgs:
-            resultados = list(ddgs.text(pergunta + " UX design Nielsen Norman nngroup.com", max_results=2))
-            return " ".join([r["body"] for r in resultados])[:500]
-    except:
-        return ""
-
-def buscar_wikipedia(pergunta):
-    page = wiki.page(pergunta)
-    if page.exists():
-        return page.summary[:500]
-    return ""
-
-def buscar_contexto(pergunta):
-    if len(pergunta) < 15:
-        return ""
-    tipo = detectar_tipo(pergunta)
-    if tipo == "tech":
-        return buscar_mdn(pergunta)
-    elif tipo == "ux":
-        return buscar_ux(pergunta)
-    else:
-        return buscar_wikipedia(pergunta)
-
-def perguntar_groq(pergunta, historico_conversa=""):
-    contexto = buscar_contexto(pergunta)
+def perguntar_groq(mensagens):
     resposta = groq_client.chat.completions.create(
         model="llama-3.3-70b-versatile",
-        messages=[
-            {
-                "role": "system",
-                "content": f"""You are Ari, a helpful and friendly tutor specializing in technology, UX design and English.
-You are talking to Ariana, a Brazilian IT student.
-Use reliable sources and be confident in your answers.
-Context from search: {contexto}
-Previous conversation: {historico_conversa}
-Always answer in this exact format:
-EN: (answer in English, max 3 lines)
-PT: (same answer in Portuguese, max 3 lines)
-WORD: (1 key English word) = (pronunciation) = (meaning in Portuguese)
-SAY IT: (how to say the user's question in English, natural and casual)"""
-            },
-            {
-                "role": "user",
-                "content": pergunta
-            }
-        ],
-        temperature=0.3,
-        max_tokens=500
+        messages=mensagens,
+        temperature=0.7,
+        max_tokens=1000
     )
     return resposta.choices[0].message.content
 
-async def gerar_audio(texto, velocidade="en-US-GuyNeural"):
-    communicate = edge_tts.Communicate(texto, voice=velocidade)
-    await communicate.save("/tmp/resposta.mp3")
+def transcrever_voz(caminho_audio):
+    with open(caminho_audio, "rb") as f:
+        transcricao = groq_client.audio.transcriptions.create(
+            model="whisper-large-v3",
+            file=f,
+            language="pt"
+        )
+    return transcricao.text
+
+async def gerar_audio_async(texto, arquivo, voz="en-US-GuyNeural"):
+    communicate = edge_tts.Communicate(texto, voz)
+    await communicate.save(arquivo)
+
+def falar_em_partes(chat_id, texto, voz="en-US-GuyNeural"):
+    """Voz padrão: amigo americano (en-US-GuyNeural)"""
+    sentencas = re.split(r'(?<=[.!?])\s+', texto)
+    partes = []
+    parte_atual = ""
+    for s in sentencas:
+        if len(parte_atual) + len(s) < 400:
+            parte_atual += " " + s
+        else:
+            if parte_atual:
+                partes.append(parte_atual.strip())
+            parte_atual = s
+    if parte_atual:
+        partes.append(parte_atual.strip())
+    for i, parte in enumerate(partes):
+        arquivo = f"/tmp/voz_{chat_id}_{i}.mp3"
+        asyncio.run(gerar_audio_async(parte, arquivo, voz))
+        if not os.path.exists(arquivo):
+            continue
+        enviar_audio_telegram(chat_id, arquivo)
+        os.remove(arquivo)
+        time.sleep(0.3)
+
+def falar_diario(chat_id, texto_pt, texto_en):
+    """
+    Relatório/diário bilíngue:
+    - Parte em português: en-US-GuyNeural (amigo narrando)
+    - Parte em 1ª pessoa em inglês: en-US-AriaNeural (voz da Ariana)
+    """
+    # Manda o texto primeiro
+    enviar_mensagem(chat_id, f"🇧🇷 {texto_pt}")
+    enviar_mensagem(chat_id, f"🇺🇸 {texto_en}")
+
+    # Áudio PT — voz do amigo
+    falar_em_partes(chat_id, texto_pt, voz="pt-BR-AntonioNeural")
+    # Áudio EN — voz da Ariana (1ª pessoa)
+    falar_em_partes(chat_id, texto_en, voz="en-US-AriaNeural")
 
 def enviar_mensagem(chat_id, texto):
     requests.post(f"{TELEGRAM_URL}/sendMessage", json={
-        "chat_id": chat_id,
+        "chat_id": str(chat_id),
         "text": texto
     })
 
-def enviar_audio(chat_id, texto, voz="en-US-GuyNeural"):
-    if texto:
-        asyncio.run(gerar_audio(texto, voz))
-        with open("/tmp/resposta.mp3", "rb") as audio:
-            requests.post(f"{TELEGRAM_URL}/sendVoice", files={
-                "voice": audio
-            }, data={"chat_id": chat_id})
+def enviar_audio_telegram(chat_id, caminho):
+    with open(caminho, "rb") as f:
+        requests.post(f"{TELEGRAM_URL}/sendVoice",
+            data={"chat_id": str(chat_id)},
+            files={"voice": f}
+        )
 
-def extrair_partes(resposta):
-    en, pt, word, say_it = "", "", "", ""
-    for linha in resposta.split('\n'):
-        if linha.startswith("EN:"):
-            en = linha.replace("EN:", "").strip()
-        elif linha.startswith("PT:"):
-            pt = linha.replace("PT:", "").strip()
-        elif linha.startswith("WORD:"):
-            word = linha.replace("WORD:", "").strip()
-        elif linha.startswith("SAY IT:"):
-            say_it = linha.replace("SAY IT:", "").strip()
-    return en, pt, word, say_it
+def baixar_arquivo_telegram(file_id, extensao):
+    info = requests.get(f"{TELEGRAM_URL}/getFile",
+        params={"file_id": file_id}).json()
+    file_path = info["result"]["file_path"]
+    url = f"https://api.telegram.org/file/bot{TELEGRAM_TOKEN}/{file_path}"
+    conteudo = requests.get(url).content
+    caminho = f"/tmp/arquivo_{file_id}.{extensao}"
+    with open(caminho, "wb") as f:
+        f.write(conteudo)
+    return caminho
 
 def obter_updates(offset=0):
     response = requests.get(f"{TELEGRAM_URL}/getUpdates", params={
@@ -125,6 +135,217 @@ def obter_updates(offset=0):
         "timeout": 30
     })
     return response.json()
+
+def get_sessao(chat_id):
+    if chat_id not in sessoes:
+        sessoes[chat_id] = {
+            "estado": "normal",
+            "materiais": [],
+            "videos": [],
+            "semana": None,
+            "historico": [{"role": "system", "content": SISTEMA_PROMPT}]
+        }
+    return sessoes[chat_id]
+
+def gerar_flashcards(tema, chat_id):
+    enviar_mensagem(chat_id, f"Generating flashcards about {tema}...")
+    contexto = buscar_contexto_pessoal(tema)
+    resposta = groq_client.chat.completions.create(
+        model="llama-3.3-70b-versatile",
+        messages=[{
+            "role": "user",
+            "content": f"""Create 10 flashcards about {tema} based on this content:
+{contexto}
+Format:
+FRONT: (question or English term)
+BACK: (answer or translation + practical example)
+---"""
+        }],
+        temperature=0.3,
+        max_tokens=2000
+    )
+    enviar_mensagem(chat_id, resposta.choices[0].message.content)
+
+def gerar_questoes(tema, chat_id):
+    enviar_mensagem(chat_id, f"Generating questions about {tema}...")
+    contexto = buscar_contexto_pessoal(tema)
+    resposta = groq_client.chat.completions.create(
+        model="llama-3.3-70b-versatile",
+        messages=[{
+            "role": "user",
+            "content": f"""Create 5 exam questions about {tema} based on this content:
+{contexto}
+Include both essay and multiple choice questions.
+After each question include the commented answer key."""
+        }],
+        temperature=0.3,
+        max_tokens=2000
+    )
+    enviar_mensagem(chat_id, resposta.choices[0].message.content)
+
+def processar_mensagem(chat_id, mensagem):
+    from transcrever import processar_youtube
+    from notificacoes import verificar_resposta, tem_notificacao_pendente
+
+    sessao = get_sessao(chat_id)
+    texto_usuario = ""
+
+    if "voice" in mensagem:
+        caminho = baixar_arquivo_telegram(mensagem["voice"]["file_id"], "ogg")
+        texto_usuario = transcrever_voz(caminho)
+        os.remove(caminho)
+        enviar_mensagem(chat_id, f'🎤 Got it: "{texto_usuario}"')
+
+    elif "text" in mensagem:
+        texto_usuario = mensagem["text"]
+
+    elif "document" in mensagem:
+        doc = mensagem["document"]
+        nome = doc.get("file_name", "arquivo")
+        ext = nome.split(".")[-1].lower() if "." in nome else "pdf"
+        caminho = baixar_arquivo_telegram(doc["file_id"], ext)
+        sessao["materiais"].append(caminho)
+        enviar_mensagem(chat_id,
+            f"✅ {nome} received!\n"
+            f"Total: {len(sessao['materiais'])} file(s)\n"
+            f"Send more or say 'processar' to start!"
+        )
+        return
+
+    elif "photo" in mensagem:
+        foto = mensagem["photo"][-1]
+        caminho = baixar_arquivo_telegram(foto["file_id"], "jpg")
+        sessao["materiais"].append(caminho)
+        caption = mensagem.get("caption", "")
+        if caption:
+            sessao["materiais"].append(f"INSTRUCAO: {caption}")
+        enviar_mensagem(chat_id,
+            f"✅ Photo received!\n"
+            f"Total: {len(sessao['materiais'])} file(s)\n"
+            f"Send more or say 'processar' to start!"
+        )
+        return
+
+    if not texto_usuario:
+        return
+
+    # Se tem notificação pendente, passa pro módulo de notificações primeiro
+    if tem_notificacao_pendente():
+        tratado = verificar_resposta(texto_usuario)
+        if tratado:
+            return
+
+    intencao = detectar_intencao(texto_usuario)
+
+    if intencao == "video":
+        links = re.findall(r'https?://\S+', texto_usuario)
+        for link in links:
+            if "youtube" in link or "youtu.be" in link:
+                sessao["videos"].append(link.strip())
+        from fila import salvar_fila
+        salvar_fila(sessao["videos"], sessao["materiais"])
+        if sessao["videos"]:
+            sessao["estado"] = "aguardando_materiais"
+            enviar_mensagem(chat_id,
+                f"✅ {len(sessao['videos'])} video(s) received!\n\n"
+                f"Send support materials if you have them:\n"
+                f"📄 PDFs, 📸 Photos, 🔗 Links\n\n"
+                f"When done say 'processar'!\n"
+                f"No material? Say 'processar' now!"
+            )
+        return
+
+    if intencao == "processar":
+        if not sessao["videos"]:
+            enviar_mensagem(chat_id, "Send the YouTube link first!")
+            return
+        total = len(sessao["videos"])
+        enviar_mensagem(chat_id,
+            f"🚀 Starting analysis of {total} video(s)!\n"
+            f"Materials: {len(sessao['materiais'])}\n"
+            f"This might take a few minutes..."
+        )
+        def rodar():
+            try:
+                with open("/tmp/processando_video.txt", "w") as f:
+                    f.write("1")
+                from fila import salvar_fila, remover_video_processado
+                for i, url in enumerate(sessao["videos"]):
+                    enviar_mensagem(chat_id, f"📹 Processando vídeo {i+1}/{total}...")
+                    processar_youtube(url, sessao["materiais"])
+                    remover_video_processado(url)
+                    salvar_fila(sessao["videos"], sessao["materiais"])
+                    if resultado is None:
+                        enviar_mensagem(chat_id, f"⚠️ Vídeo {i+1} pulado — sem áudio disponível")
+                sessao["estado"] = "normal"
+                sessao["videos"] = []
+                sessao["materiais"] = []
+                enviar_mensagem(chat_id, f"✅ Todos os {total} vídeos foram analisados!")
+            except Exception as e:
+                enviar_mensagem(chat_id, f"Erro: {e}")
+            finally:
+                if os.path.exists("/tmp/processando_video.txt"):
+                    os.remove("/tmp/processando_video.txt")
+        threading.Thread(target=rodar, daemon=True).start()
+        return
+
+    if intencao == "relatorio":
+        enviar_mensagem(chat_id, "Generating your daily diary... 📖")
+        diario_pt, diario_en = gerar_diario_hoje()
+        falar_diario(chat_id, diario_pt, diario_en)
+        return
+
+    if intencao == "flashcard":
+        tema = texto_usuario.lower()
+        for palavra in ["flashcard", "flash card", "cartão", "cartao", "me", "faz", "cria", "sobre", "de"]:
+            tema = tema.replace(palavra, "").strip()
+        if not tema:
+            tema = "the last studied subject"
+        gerar_flashcards(tema, chat_id)
+        return
+
+    if intencao == "questoes":
+        tema = texto_usuario.lower()
+        for palavra in ["questao", "questão", "prova", "exercicio", "exercício", "cria", "gera", "sobre", "de", "me"]:
+            tema = tema.replace(palavra, "").strip()
+        if not tema:
+            tema = "the last studied subject"
+        gerar_questoes(tema, chat_id)
+        return
+
+    if intencao == "limpar":
+        sessoes[chat_id] = None
+        get_sessao(chat_id)
+        enviar_mensagem(chat_id, "Fresh start! What are we learning today? 😄")
+        return
+
+    contexto_aulas = buscar_contexto_pessoal(texto_usuario)
+    if contexto_aulas:
+        sessao["historico"].append({
+            "role": "system",
+            "content": f"Use this content from Ariana's classes to help answer:\n{contexto_aulas[:2000]}"
+        })
+
+    sessao["historico"].append({
+        "role": "user",
+        "content": texto_usuario
+    })
+
+    resposta = perguntar_groq(sessao["historico"])
+
+    sessao["historico"].append({
+        "role": "assistant",
+        "content": resposta
+    })
+
+    if len(sessao["historico"]) > 24:
+        sistema = sessao["historico"][0]
+        sessao["historico"] = [sistema] + sessao["historico"][-20:]
+
+    salvar_aprendizado(texto_usuario, resposta)
+
+    # Resposta em áudio — sempre voz do amigo americano
+    falar_em_partes(chat_id, resposta, voz="pt-BR-AntonioNeural")
 
 def iniciar_bot():
     print("Bot iniciado com Groq!")
@@ -135,65 +356,14 @@ def iniciar_bot():
             for update in updates.get("result", []):
                 offset = update["update_id"] + 1
                 if "message" in update:
-                    chat_id = update["message"]["chat"]["id"]
-                    texto_original = update["message"].get("text", "").strip()
-                    texto = texto_original.lower()
-                    if not texto:
-                        continue
-
-                    print(f"Mensagem: {texto}")
+                    chat_id = str(update["message"]["chat"]["id"])
                     with open("/tmp/ultima_mensagem.txt", "w") as f:
                         f.write(str(time.time()))
-                    if ("youtube.com" in texto or "youtu.be" in texto) and texto.startswith("http"):
-                        enviar_mensagem(chat_id, "Recebi o link! Processando a aula... pode demorar alguns minutos.")
-                        from transcrever import processar_youtube
-                        processar_youtube(texto_original)
-                        continue
-
-                    if chat_id in aguardando:
-                        estado = aguardando[chat_id]
-
-                        if texto == "repete":
-                            enviar_audio(chat_id, estado["en"], "en-US-GuyNeural")
-                            enviar_mensagem(chat_id, "Ouviu de novo! Me conta o que entendeu. Se quiser o texto escreve 'escreve'.")
-                            continue
-
-                        elif texto == "escreve":
-                            enviar_mensagem(chat_id, f"EN: {estado['en']}")
-                            enviar_mensagem(chat_id, "Entendeu agora? Se quiser a traducao manda 'traduz'.")
-                            continue
-
-                        elif texto == "traduz":
-                            enviar_mensagem(chat_id, f"PT: {estado['pt']}\nWORD: {estado['word']}\nSAY IT: {estado['say_it']}")
-                            del aguardando[chat_id]
-                            continue
-
-                        else:
-                            enviar_mensagem(chat_id, f"EN: {estado['en']}\nPT: {estado['pt']}\nWORD: {estado['word']}\nSAY IT: {estado['say_it']}")
-                            del aguardando[chat_id]
-                            from relatorio import registrar_aprendizado
-                            registrar_aprendizado(estado["pergunta"], estado["en"])
-                            continue
-
-                    contexto_conversa = historico.get(chat_id, "")
-                    resposta = perguntar_groq(texto, contexto_conversa)
-                    historico[chat_id] = f"Pergunta: {texto} Resposta: {resposta}"
-                    from relatorio import registrar_aprendizado
-                    registrar_aprendizado(texto, resposta)
-
-                    en, pt, word, say_it = extrair_partes(resposta)
-                    aguardando[chat_id] = {
-                        "pergunta": texto,
-                        "en": en,
-                        "pt": pt,
-                        "word": word,
-                        "say_it": say_it
-                    }
-
-                    en_curto = en.split('.')[0] + '.' if en else ""
-                    enviar_audio(chat_id, en_curto)
-                    enviar_mensagem(chat_id, "👆 O que você entendeu? Me conta!\nComandos: 'repete' | 'escreve' | 'traduz'")
-
+                    threading.Thread(
+                        target=processar_mensagem,
+                        args=(chat_id, update["message"]),
+                        daemon=True
+                    ).start()
         except Exception as e:
             print(f"Erro: {e}")
             time.sleep(5)

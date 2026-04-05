@@ -83,7 +83,7 @@ Be enthusiastic and celebrate your own progress!"""
     return conteudo, texto_en
 
 async def gerar_audio(texto):
-    communicate = edge_tts.Communicate(texto, voice="en-US-GuyNeural")
+    communicate = edge_tts.Communicate(texto, voice="pt-BR-AntonioNeural")
     await communicate.save("/tmp/relatorio.mp3")
 
 def enviar_relatorio():
