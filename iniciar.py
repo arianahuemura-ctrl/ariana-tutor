@@ -37,7 +37,8 @@ for i, url in enumerate(videos[:]):
         processar_youtube(url, materiais)
         remover_video_processado(url)
     except Exception as e:
-        enviar_progresso(f'❌ Erro no vídeo {{i+1}}: {{e}}')
+        remover_video_processado(url)
+        enviar_progresso(f'❌ Erro no vídeo {{i+1}}: {{e}} — pulando...')
 enviar_progresso('✅ Fila concluída!')
 """])
 

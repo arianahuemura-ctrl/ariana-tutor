@@ -1,7 +1,7 @@
 import json
 import os
 
-FILA_FILE = "/home/ariana/sistema-tutor/fila_videos.json"
+FILA_FILE = "/home/ubuntu/ariana-tutor/fila_videos.json"
 
 def salvar_fila(videos, materiais):
     with open(FILA_FILE, "w") as f:
