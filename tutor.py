@@ -344,8 +344,9 @@ def processar_mensagem(chat_id, mensagem):
         "role": "user",
         "content": texto_usuario
     })
-
+    sessao["historico"].append({"role": "system", "content": "IMPORTANT: Always respond in English only. Never switch to Portuguese unless user says traduz or nao entendi."})
     resposta = perguntar_groq(sessao["historico"])
+
 
     sessao["historico"].append({
         "role": "assistant",
