@@ -32,7 +32,7 @@ def baixar_audio_youtube(url, tentativas=3):
         try:
             resultado = subprocess.run([
                 'yt-dlp',
-                '--remote-components', 'ejs:github',
+                '--js-runtimes', 'node',
                 '--format', 'bestaudio/best',
                 '--extract-audio',
                 '--audio-format', 'mp3',
