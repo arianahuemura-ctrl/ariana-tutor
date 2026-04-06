@@ -42,7 +42,7 @@ def baixar_audio_youtube(url, tentativas=3):
                 '--retries', '5',
                 '--cookies', COOKIES_FILE,
                 url
-            ], capture_output=True, text=True)
+            ], capture_output=True, text=True, timeout=300)
 
             if os.path.exists('/tmp/aula.mp3'):
                 return '/tmp/aula.mp3'
@@ -424,7 +424,7 @@ def salvar_no_drive(doc_pt, doc_en, titulo="Aula"):
     resultado = subprocess.run([
         'rclone', 'link',
         f'gdrive:Ariana Tutor/Videoaulas/{data}/{titulo}_bilingual.md'
-    ], capture_output=True, text=True)
+    ], capture_output=True, text=True, timeout=300)
     
     link = resultado.stdout.strip()
     if link:
