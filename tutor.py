@@ -360,7 +360,7 @@ def processar_mensagem(chat_id, mensagem):
     salvar_historico("user", texto_usuario, tema_detectado)
     salvar_historico("assistant", resposta, tema_detectado)
     # Resposta em áudio — sempre voz do amigo americano
-    falar_em_partes(chat_id, resposta, voz="pt-BR-AntonioNeural")
+    enviar_mensagem(chat_id, resposta)
     
 def iniciar_bot():
     print("Bot iniciado com Groq!")
