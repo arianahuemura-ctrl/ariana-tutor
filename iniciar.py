@@ -7,10 +7,14 @@ import json
 FILA_FILE = "/home/ubuntu/ariana-tutor/fila_videos.json"
 
 def rodar_tutor():
-    subprocess.run(["/home/ubuntu/ariana-tutor/venv/bin/python3", "tutor.py"])
+    while True:
+        subprocess.run(["/home/ubuntu/ariana-tutor/venv/bin/python3", "tutor.py"])
+        time.sleep(3)
 
 def rodar_notificacoes():
-    subprocess.run(["/home/ubuntu/ariana-tutor/venv/bin/python3", "notificacoes.py"])
+    while True:
+        subprocess.run(["/home/ubuntu/ariana-tutor/venv/bin/python3", "notificacoes.py"])
+        time.sleep(3)
 
 def retomar_fila_pendente():
     if not os.path.exists(FILA_FILE):
