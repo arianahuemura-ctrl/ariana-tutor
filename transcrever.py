@@ -28,6 +28,9 @@ QUERIES_FONTES = [
 
 def baixar_audio_youtube(url, tentativas=3):
     print(f"Baixando audio do YouTube: {url}")
+    for f in os.listdir('/tmp'):
+        if f.startswith('aula') and f.endswith('.mp3'):
+            os.remove(f'/tmp/{f}')
     for tentativa in range(1, tentativas + 1):
         try:
             resultado = subprocess.run([
