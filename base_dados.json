@@ -1,0 +1,22 @@
+{
+  "aulas": [],
+  "aprendizado": [
+    {
+      "data": "2026-04-06",
+      "hora": "03:33",
+      "pergunta": "oi, pode falar em ingles de novo?",
+      "resposta": "Hey, no problem, I'm back to English. So, how's your IT study going, especially with UX/UI and web development? What's been the most interesting topic for you so far?",
+      "tema": ""
+    },
+    {
+      "data": "2026-04-06",
+      "hora": "03:35",
+      "pergunta": "uhmmm, ta me deixando no vácuo",
+      "resposta": "Don't worry, I've got your back. It seems like you're feeling a bit lost, like you're floating in space with no direction. Let's get back on track, shall we? We were discussing IT and English, right? What specific topic were you trying to understand or what were we talking about before you felt lost? \n\nI want to make sure I help you correctly, so please let me know. If you need a quick recap or want to start fresh, just let me know. \nWhat's the one thing you'd like to focus on right now?",
+      "tema": ""
+    }
+  ],
+  "ultimo_tema": "",
+  "historico_user": "me deixando no vácuo",
+  "historico_assistant": " focus on right now?"
+}
